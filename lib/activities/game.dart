@@ -5,6 +5,7 @@ import 'package:valid_minesweeper/activities/ceil.dart';
 import 'package:valid_minesweeper/settings/start_settings.dart';
 import 'package:valid_minesweeper/utils/image_enum.dart';
 import 'package:valid_minesweeper/utils/image_manage.dart';
+import 'package:valid_minesweeper/activities/logic.dart';
 
 class Game extends StatefulWidget {
   const Game({super.key});
@@ -19,17 +20,16 @@ class GameState extends State<Game> {
   int bombsCount = MySettings.getbombCount();
   late int ceilsFreeTest;
   late bool firstStep;
-  late int firstX;
-  late int firstY;
+
   late int hintCount;
   late dynamic random;
   late Timer? timer;
   int seconds = 0;
   late bool stopBot;
 
-  // Массив содержащий объекты клеток
-  late List<List<Ceil>> playground;
-  late List<List<Ceil>> testGround;
+  // Создаем класс логику
+  Logic logic = Logic();
+
   late int ceilsFree;
 
   @override
@@ -111,7 +111,7 @@ class GameState extends State<Game> {
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Text(
-                                "${MySettings.getbombCount()}",
+                                "${logic.bombsCount}",
                                 style: const TextStyle(
                                   fontSize: 22,
                                   color: Colors.red,
@@ -219,65 +219,52 @@ class GameState extends State<Game> {
                 crossAxisCount: columnCount,
               ),
               itemBuilder: (context, position) {
+                Image image = logic.getImage(position);
                 int rowNumber = (position / columnCount).floor();
                 int columnNumber = (position % columnCount);
-
-                Image image;
-
-                if (playground[rowNumber][columnNumber].isOpen == false) {
-                  if (playground[rowNumber][columnNumber].isFlaged == true) {
-                    image = ImageManager.getImage(ImageType.flagged);
-                    playground[rowNumber][columnNumber].isHint = false;
-                  } else {
-                    image = ImageManager.getImage(ImageType.facingDown);
-                  }
-                  if (playground[rowNumber][columnNumber].isHint) {
-                    image = Image.asset("images/facingDown.png",
-                        color: const Color.fromARGB(255, 217, 219, 82));
-                  }
-                } else {
-                  if (playground[rowNumber][columnNumber].isBomb) {
-                    image = ImageManager.getImage(ImageType.bomb);
-                  } else {
-                    image = ImageManager.getImage(
-                      ImageManager.getImageTypeFromNumber(
-                          playground[rowNumber][columnNumber].bombsAround),
-                    );
-                  }
-                }
-
                 return InkWell(
-                  // обработка нажатяи на клетку
+                  // обработка нажатия на клетку
                   onTap: () {
                     if (!firstStep) {
                       setState(() {
+                        // передать
                         firstStep = true;
-                        firstX = rowNumber;
-                        firstY = columnNumber;
-                        _boardGenerator();
+                        if (!logic.boardGenerator(rowNumber, columnNumber)) {
+                          _inputCheckAlert();
+                        }
                       });
                     }
-                    if (playground[rowNumber][columnNumber].isBomb) {
+                    if (logic.playground[rowNumber][columnNumber].isBomb) {
                       _gameOverAlert();
                     }
-                    if (playground[rowNumber][columnNumber].bombsAround == 0) {
-                      _handleTap(rowNumber, columnNumber);
+                    if (logic.playground[rowNumber][columnNumber].bombsAround ==
+                        0) {
+                      setState(() {
+                        logic.handleTap(rowNumber, columnNumber);
+                      });
                     } else {
                       setState(() {
-                        playground[rowNumber][columnNumber].isOpen = true;
+                        logic.playground[rowNumber][columnNumber].isOpen = true;
                         ceilsFree = ceilsFree - 1;
                       });
                     }
 
-                    if (ceilsFree == 0) {
+                    if (logic.ceilsFree == 0) {
                       _winAlert();
                     }
                   },
                   // Постановка флагов длительным нажатием
                   onLongPress: () {
                     setState(() {
-                      playground[rowNumber][columnNumber].isFlaged =
-                          !playground[rowNumber][columnNumber].isFlaged;
+                      if (logic.playground[rowNumber][columnNumber].isFlaged) {
+                        logic.bombsCount++;
+                        logic.playground[rowNumber][columnNumber].isFlaged =
+                            false;
+                      } else {
+                        logic.bombsCount--;
+                        logic.playground[rowNumber][columnNumber].isFlaged =
+                            true;
+                      }
                     });
                   },
                   splashColor: Colors.grey,
@@ -295,14 +282,11 @@ class GameState extends State<Game> {
     );
   }
 
-  // Инициализация игры
+// Инициализация игры
   void initialiseGame() {
+    logic.initialiseLogic();
     hintCount = 3;
-    random = Random();
     firstStep = false;
-    firstX = -1;
-    firstY = -1;
-    stopBot = false;
     rowCount = MySettings.getrowCount();
     columnCount = MySettings.getcolumnCount();
     bombsCount = MySettings.getbombCount();
@@ -314,17 +298,7 @@ class GameState extends State<Game> {
       stopBot = true;
       _inputCheckAlert();
     }
-    playground = List.generate(rowCount, (i) {
-      return List.generate(columnCount, (j) {
-        return Ceil();
-      });
-    });
 
-    testGround = List.generate(rowCount, (i) {
-      return List.generate(columnCount, (j) {
-        return Ceil();
-      });
-    });
     //  время
     seconds = 0;
     timer = Timer.periodic(
@@ -332,201 +306,6 @@ class GameState extends State<Game> {
       (Timer t) => updateTime(),
     );
 
-    setState(() {});
-  }
-
-  void _boardGenerator() {
-    bool isValid = false;
-    int localCounter = 0;
-    while (!isValid) {
-      localCounter++;
-      print('$localCounter');
-      if (localCounter >= 1100) {
-        _inputCheckAlert();
-        break;
-      }
-
-      ceilsFreeTest = rowCount * columnCount;
-      playground = List.generate(rowCount, (i) {
-        return List.generate(columnCount, (j) {
-          return Ceil();
-        });
-      });
-
-      testGround = List.generate(rowCount, (i) {
-        return List.generate(columnCount, (j) {
-          return Ceil();
-        });
-      });
-
-      for (var i = 0; i < rowCount; i++) {
-        for (var j = 0; j < columnCount; j++) {
-          playground[i][j].bombsAround = 0;
-          playground[i][j].isBomb = false;
-          testGround[i][j].bombsAround = 0;
-          testGround[i][j].isBomb = false;
-        }
-      }
-      // обработка первого хода
-      for (var i = firstX - 1; i <= firstX + 1; i++) {
-        for (var j = firstY - 1; j <= firstY + 1; j++) {
-          if (i >= 0 && i < rowCount && j >= 0 && j < columnCount) {
-            playground[i][j].isBooked = true;
-            testGround[i][j].isBooked = true;
-          }
-        }
-      }
-
-      // Случайная расстановка бомб с учётом первого хода
-      for (var i = 0; i < bombsCount; i++) {
-        int x, y;
-        do {
-          x = random.nextInt(rowCount);
-          y = random.nextInt(columnCount);
-        } while (playground[x][y].isBomb || playground[x][y].isBooked);
-        --ceilsFree;
-        --ceilsFreeTest;
-        playground[x][y].isBomb = true;
-        testGround[x][y].isBomb = true;
-      }
-
-      // Функция вычисления бомб рядом с клеткой
-
-      for (var i = 0; i < rowCount; i++) {
-        for (var j = 0; j < columnCount; j++) {
-          playground[i][j].bombsAround = _countBombsAround(i, j, playground);
-          testGround[i][j].bombsAround = _countBombsAround(i, j, testGround);
-        }
-      }
-      isValid = botValidator(isValid);
-    }
-  }
-
-  bool botValidator(bool validFlag) {
-    _botTap(firstX, firstY);
-
-    while (!isWin(testGround) && !stopBot) {
-      bool specialMove = false;
-      for (var i = 0; i < rowCount; i++) {
-        for (var j = 0; j < columnCount; j++) {
-          if (testGround[i][j].bombsAround > 0 && !testGround[i][j].isBomb) {
-            // теперь обрабатываю каждую клетку
-            var closedCount = 0;
-            var flagedCount = 0;
-            for (var dx = i - 1; dx <= i + 1; dx++) {
-              for (var dy = j - 1; dy <= j + 1; dy++) {
-                if (dx >= 0 && dx < rowCount && dy >= 0 && dy < columnCount) {
-                  if (!testGround[dx][dy].isOpen) {
-                    closedCount++;
-                  }
-                  if (testGround[dx][dy].isFlaged &&
-                      !testGround[dx][dy].isOpen) {
-                    flagedCount++;
-                  }
-                }
-              }
-            }
-            // проверка, что кол-во неоткрытых клеток вокруг равно количесву бомб вокруг
-            if (closedCount == testGround[i][j].bombsAround) {
-              for (var dx = i - 1; dx <= i + 1; dx++) {
-                for (var dy = j - 1; dy <= j + 1; dy++) {
-                  if (dx >= 0 && dx < rowCount && dy >= 0 && dy < columnCount) {
-                    if (!testGround[dx][dy].isFlaged) {
-                      testGround[dx][dy].isFlaged = true;
-                      specialMove = true;
-                    }
-                  }
-                }
-              }
-            }
-
-            if (flagedCount == testGround[i][j].bombsAround) {
-              for (var dx = i - 1; dx <= i + 1; dx++) {
-                for (var dy = j - 1; dy <= j + 1; dy++) {
-                  if (dx >= 0 && dx < rowCount && dy >= 0 && dy < columnCount) {
-                    if (!testGround[dx][dy].isFlaged) {
-                      testGround[dx][dy].isOpen = true;
-                      _botTap(dx, dy);
-                      specialMove = true;
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-        setState(() {});
-      }
-      if (specialMove == false) {
-        break;
-      }
-    }
-    validFlag = isWin(testGround);
-    return validFlag;
-  }
-
-  void _botTap(int i, int j) {
-    ceilsFreeTest = ceilsFreeTest - 1;
-    testGround[i][j].isOpen = true;
-    if (testGround[i][j].bombsAround == 0) {
-      for (var dx = -1; dx <= 1; dx++) {
-        for (var dy = -1; dy <= 1; dy++) {
-          final nx = i + dx;
-          final ny = j + dy;
-          if (nx >= 0 &&
-              nx < rowCount &&
-              ny >= 0 &&
-              ny < columnCount &&
-              !testGround[nx][ny].isOpen) {
-            _botTap(nx, ny);
-          }
-        }
-      }
-    }
-    setState(() {});
-  }
-
-  bool isWin(List<List<Ceil>> testGround) {
-    for (var i = 0; i < rowCount; i++) {
-      for (var j = 0; j < columnCount; j++) {
-        if (!testGround[i][j].isOpen && !testGround[i][j].isBomb) {
-          return false;
-        }
-      }
-    }
-    return true;
-  }
-
-  int _countBombsAround(int x, int y, List<List<Ceil>> ground) {
-    var bombsCount = 0;
-    for (var i = x - 1; i <= x + 1; i++) {
-      for (var j = y - 1; j <= y + 1; j++) {
-        if (i >= 0 && i < rowCount && j >= 0 && j < columnCount) {
-          if (ground[i][j].isBomb) bombsCount++;
-        }
-      }
-    }
-    return bombsCount;
-  }
-
-  void _handleTap(int i, int j) {
-    ceilsFree = ceilsFree - 1;
-    playground[i][j].isOpen = true;
-    if (playground[i][j].bombsAround == 0) {
-      for (var dx = -1; dx <= 1; dx++) {
-        for (var dy = -1; dy <= 1; dy++) {
-          final nx = i + dx;
-          final ny = j + dy;
-          if (nx >= 0 &&
-              nx < rowCount &&
-              ny >= 0 &&
-              ny < columnCount &&
-              !playground[nx][ny].isOpen) {
-            _handleTap(nx, ny);
-          }
-        }
-      }
-    }
     setState(() {});
   }
 
@@ -601,15 +380,15 @@ class GameState extends State<Game> {
     if (hintCount != 0 && firstStep) {
       for (var i = 0; i < rowCount; i++) {
         for (var j = 0; j < columnCount; j++) {
-          if (playground[i][j].isBomb && !playground[i][j].isHint) {
+          if (logic.playground[i][j].isBomb && !logic.playground[i][j].isHint) {
             for (var x = i - 1; x <= i + 1; x++) {
               for (var y = j - 1; y <= j + 1; y++) {
                 if (x >= 0 &&
                     x < rowCount &&
                     y >= 0 &&
                     y < columnCount &&
-                    playground[x][y].isOpen) {
-                  playground[i][j].isHint = true;
+                    logic.playground[x][y].isOpen) {
+                  logic.playground[i][j].isHint = true;
                   --hintCount;
                   setState(() {});
                   return true;
