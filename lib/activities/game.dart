@@ -1,11 +1,7 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:valid_minesweeper/activities/ceil.dart';
 import 'package:valid_minesweeper/settings/start_settings.dart';
-import 'package:valid_minesweeper/utils/image_enum.dart';
-import 'package:valid_minesweeper/utils/image_manage.dart';
-import 'package:valid_minesweeper/activities/logic.dart';
+import 'package:valid_minesweeper/logic/logic.dart';
 
 class Game extends StatefulWidget {
   const Game({super.key});
@@ -18,14 +14,11 @@ class GameState extends State<Game> {
   int rowCount = MySettings.getrowCount();
   int columnCount = MySettings.getcolumnCount();
   int bombsCount = MySettings.getbombCount();
-  late int ceilsFreeTest;
   late bool firstStep;
-
   late int hintCount;
   late dynamic random;
   late Timer? timer;
   int seconds = 0;
-  late bool stopBot;
 
   // Создаем класс логику
   Logic logic = Logic();
@@ -41,6 +34,7 @@ class GameState extends State<Game> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color.fromRGBO(224, 224, 224, 1),
       appBar: AppBar(
         actions: [
           IconButton(
@@ -52,7 +46,7 @@ class GameState extends State<Game> {
         ],
         title: const Text(
           'Game',
-          style: TextStyle(fontSize: 27.0, color: Colors.white),
+          style: TextStyle(fontSize: 30.0, color: Colors.white),
         ),
         centerTitle: true,
       ),
@@ -62,11 +56,13 @@ class GameState extends State<Game> {
             decoration: BoxDecoration(
               //color: const Color(Colors.greenAccent),
               border: Border.all(
-                color: const Color.fromARGB(255, 186, 198, 186),
+                //color: const Color.fromARGB(255, 186, 198, 186),
+                color: const Color.fromRGBO(224, 224, 224, 1),
                 width: 8,
               ),
               borderRadius: BorderRadius.circular(12),
-              color: const Color.fromARGB(255, 186, 198, 186),
+              //color: const Color.fromARGB(255, 186, 198, 186),
+              color: const Color.fromRGBO(224, 224, 224, 1),
             ),
             height: 80.0,
             width: double.infinity,
@@ -111,7 +107,7 @@ class GameState extends State<Game> {
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Text(
-                                "${logic.bombsCount}",
+                                "${logic.getBombCount()}",
                                 style: const TextStyle(
                                   fontSize: 22,
                                   color: Colors.red,
@@ -144,18 +140,17 @@ class GameState extends State<Game> {
                     ),
                     const SizedBox(width: 10),
                     // подсказка
-                    GestureDetector(
+                    InkWell(
                       onTap: () {
                         _specialHint();
                       },
-                      child:
-                          //color: Colors.green,
-                          const Center(
-                              child: Icon(
-                        Icons.lightbulb_outline,
-                        color: Colors.yellowAccent,
-                        size: 40.0,
-                      )),
+                      child: const CircleAvatar(
+                          backgroundColor: Colors.yellowAccent,
+                          child: Icon(
+                            Icons.lightbulb_outline,
+                            color: Colors.black,
+                            size: 40.0,
+                          )),
                     )
                   ],
                 ),
@@ -219,7 +214,6 @@ class GameState extends State<Game> {
                 crossAxisCount: columnCount,
               ),
               itemBuilder: (context, position) {
-                Image image = logic.getImage(position);
                 int rowNumber = (position / columnCount).floor();
                 int columnNumber = (position % columnCount);
                 return InkWell(
@@ -234,35 +228,40 @@ class GameState extends State<Game> {
                         }
                       });
                     }
-                    if (logic.playground[rowNumber][columnNumber].isBomb) {
+                    if (logic.getPlayground(rowNumber, columnNumber).isBomb) {
                       _gameOverAlert();
                     }
-                    if (logic.playground[rowNumber][columnNumber].bombsAround ==
-                        0) {
-                      setState(() {
-                        logic.handleTap(rowNumber, columnNumber);
-                      });
-                    } else {
-                      setState(() {
-                        logic.playground[rowNumber][columnNumber].isOpen = true;
-                        ceilsFree = ceilsFree - 1;
-                      });
-                    }
-
-                    if (logic.ceilsFree == 0) {
-                      _winAlert();
+                    if (!logic.getPlayground(rowNumber, columnNumber).isOpen) {
+                      if (logic
+                              .getPlayground(rowNumber, columnNumber)
+                              .bombsAround ==
+                          0) {
+                        setState(() {
+                          logic.handleTap(rowNumber, columnNumber);
+                        });
+                      } else {
+                        setState(() {
+                          logic.getPlayground(rowNumber, columnNumber).isOpen =
+                              true;
+                        });
+                      }
+                      if (logic.isWinPr()) {
+                        _winAlert();
+                      }
                     }
                   },
                   // Постановка флагов длительным нажатием
                   onLongPress: () {
                     setState(() {
-                      if (logic.playground[rowNumber][columnNumber].isFlaged) {
-                        logic.bombsCount++;
-                        logic.playground[rowNumber][columnNumber].isFlaged =
+                      if (logic
+                          .getPlayground(rowNumber, columnNumber)
+                          .isFlaged) {
+                        logic.setBombCount(true);
+                        logic.getPlayground(rowNumber, columnNumber).isFlaged =
                             false;
                       } else {
-                        logic.bombsCount--;
-                        logic.playground[rowNumber][columnNumber].isFlaged =
+                        logic.setBombCount(false);
+                        logic.getPlayground(rowNumber, columnNumber).isFlaged =
                             true;
                       }
                     });
@@ -270,7 +269,7 @@ class GameState extends State<Game> {
                   splashColor: Colors.grey,
                   child: Container(
                     color: Colors.grey,
-                    child: image,
+                    child: logic.getImage(position),
                   ),
                 );
               },
@@ -295,8 +294,7 @@ class GameState extends State<Game> {
     ceilsFree = rowCount * columnCount;
 
     if (bombsCount >= ceilsFree - 8) {
-      stopBot = true;
-      _inputCheckAlert();
+      _inputCheckAlertBomb();
     }
 
     //  время
@@ -355,20 +353,52 @@ class GameState extends State<Game> {
     );
   }
 
-  //Обработчик неправильных входных данных
+  //Обработчик неправильных входных данных (проверка на валидность)
   void _inputCheckAlert() {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text("Attention!"),
-          content: const Text("A lot of cells with bombs!"),
+          title: const Text('Attention!'),
+          content: const Text(
+              'The game can\'t guarantee the validity of the field!'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                timer?.cancel();
+                initialiseGame();
+                Navigator.pop(context);
+              },
+              child: const Text('Restart'),
+            ),
+            TextButton(
+                child: const Text('Continue'),
+                onPressed: () {
+                  Navigator.pop(context);
+                }),
+          ],
+        );
+      },
+    );
+  }
+
+  //Обработчик неправильных входных данных (количество бомб превышает размеры исходного поля)
+  void _inputCheckAlertBomb() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Attention!'),
+          content: const Text(
+              'The large number of bombs on the field, go to the settings!'),
           actions: <Widget>[
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
+                Navigator.pushNamed(context, 'menu')
+                    .then((value) => {timer?.cancel(), initialiseGame()});
               },
-              child: const Text("Continue"),
+              child: const Text('Settings'),
             ),
           ],
         );
@@ -380,15 +410,16 @@ class GameState extends State<Game> {
     if (hintCount != 0 && firstStep) {
       for (var i = 0; i < rowCount; i++) {
         for (var j = 0; j < columnCount; j++) {
-          if (logic.playground[i][j].isBomb && !logic.playground[i][j].isHint) {
+          if (logic.getPlayground(i, j).isBomb &&
+              !logic.getPlayground(i, j).isHint) {
             for (var x = i - 1; x <= i + 1; x++) {
               for (var y = j - 1; y <= j + 1; y++) {
                 if (x >= 0 &&
                     x < rowCount &&
                     y >= 0 &&
                     y < columnCount &&
-                    logic.playground[x][y].isOpen) {
-                  logic.playground[i][j].isHint = true;
+                    logic.getPlayground(x, y).isOpen) {
+                  logic.getPlayground(i, j).isHint = true;
                   --hintCount;
                   setState(() {});
                   return true;
@@ -415,6 +446,7 @@ class GameState extends State<Game> {
     }
   }
 
+  // функция обработки строки времени
   String _printDuration(Duration duration) {
     String twoDigits(int n) => n.toString().padLeft(2, "0");
     String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));

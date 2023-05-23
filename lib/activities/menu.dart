@@ -141,10 +141,14 @@ class MenuState extends State<Menu> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+        backgroundColor: const Color.fromRGBO(224, 224, 224, 1),
         appBar: AppBar(
-          title: const Text('Settings'),
+          title: const Text(
+            'Settings',
+            style: TextStyle(fontSize: 30.0, color: Colors.white),
+          ),
         ),
-        backgroundColor: Color.fromARGB(255, 255, 255, 255),
+        //backgroundColor: Color.fromARGB(255, 255, 255, 255),
         body: SingleChildScrollView(
           child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -209,6 +213,8 @@ class MenuState extends State<Menu> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Slider(
+                          activeColor: Colors.green,
+                          inactiveColor: Colors.grey.withOpacity(0.3),
                           value: _bombSlide.toDouble(),
                           min: easilyBomb.toDouble(),
                           max: hardBomb.toDouble(),
@@ -225,6 +231,8 @@ class MenuState extends State<Menu> {
 
                         // строка
                         Slider(
+                          activeColor: Colors.green,
+                          inactiveColor: Colors.grey.withOpacity(0.3),
                           value: _rowSlide.toDouble(),
                           min: easyRow.toDouble(),
                           max: 80,
@@ -241,6 +249,8 @@ class MenuState extends State<Menu> {
 
                         // столбец
                         Slider(
+                          activeColor: Colors.green,
+                          inactiveColor: Colors.grey.withOpacity(0.3),
                           value: _columnSlide.toDouble(),
                           min: easyColumn.toDouble(),
                           max: 18,
